@@ -1,0 +1,22 @@
+# Manual local smoke test, invoked by tests/act_smoke.py (not a Notomate workflow).
+name: Local composite smoke
+on:
+  workflow_dispatch:
+jobs:
+  rss:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./actions/rss-to-note
+        id: rss
+        with:
+          notomate-base-url: ${{ env.MOCK_ORIGIN }}
+          notomate-api-key: mock-only-key
+          feed-url: ${{ env.MOCK_ORIGIN }}/feed
+      - name: Verify composite outputs
+        shell: bash
+        env:
+          NOTE_ID: ${{ steps.rss.outputs.note-id }}
+          CONCLUSION: ${{ steps.rss.outputs.conclusion }}
+        run: |
+          test "$NOTE_ID" = "smoke-note"
+          test "$CONCLUSION" = "success"

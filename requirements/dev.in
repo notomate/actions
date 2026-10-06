@@ -1,0 +1,4 @@
+-r rss.in
+-r stocks.in
+pytest==9.1.1
+PyYAML==6.0.3

@@ -1,0 +1,77 @@
+name: Notomate Daily Meal Plan
+description: Generate home-cooked lunch and dinner recipes with Claude and publish one Notomate note.
+inputs:
+  notomate-base-url:
+    description: Notomate origin reachable from the runner.
+    required: true
+  notomate-api-key:
+    description: Notomate personal API key.
+    required: true
+  note-visibility:
+    description: private, workspace or public.
+    default: private
+  timezone:
+    description: IANA time zone for the note date (does not change cron).
+    default: Asia/Taipei
+  anthropic-api-key:
+    description: Anthropic API key; provide this or claude-code-oauth-token.
+    required: false
+  claude-code-oauth-token:
+    description: Claude Code OAuth token; alternative to anthropic-api-key.
+    required: false
+  servings:
+    description: Number of people, from 1 to 20.
+    default: '2'
+  dietary-preferences:
+    description: Dietary preferences; defaults to Taiwanese home cooking.
+    required: false
+  excluded-ingredients:
+    description: Ingredients that must not appear in the menu or shopping list.
+    required: false
+  model:
+    description: Claude model ID or alias; defaults to the pinned upstream action's model.
+    default: claude-sonnet-5
+outputs:
+  note-id:
+    description: ID of the note published by the Claude action.
+    value: ${{ steps.claude.outputs.note-id }}
+  conclusion:
+    description: success or failure.
+    value: ${{ steps.claude.outputs.conclusion || 'failure' }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Build dated meal prompt
+      id: prompt
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        INPUT_NOTOMATE_BASE_URL: ${{ inputs.notomate-base-url }}
+        INPUT_NOTOMATE_API_KEY: ${{ inputs.notomate-api-key }}
+        INPUT_NOTE_VISIBILITY: ${{ inputs.note-visibility }}
+        INPUT_TIMEZONE: ${{ inputs.timezone }}
+        INPUT_ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        INPUT_CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
+        INPUT_SERVINGS: ${{ inputs.servings }}
+        INPUT_DIETARY_PREFERENCES: ${{ inputs.dietary-preferences }}
+        INPUT_EXCLUDED_INGREDIENTS: ${{ inputs.excluded-ingredients }}
+      run: python "$ACTION_PATH/../../scripts/meal_prompt.py"
+    - name: Generate and publish recipes
+      id: claude
+      # Pinned v1, including direct-prompt automatic note publication.
+      uses: notomate/claude-notomate-action@8012f4faf8cb0efcaabdef2f1dc84071c8d6eb99
+      with:
+        notomate-base-url: ${{ inputs.notomate-base-url }}
+        notomate-api-key: ${{ inputs.notomate-api-key }}
+        anthropic-api-key: ${{ inputs.anthropic-api-key }}
+        claude-code-oauth-token: ${{ inputs.claude-code-oauth-token }}
+        note-visibility: ${{ inputs.note-visibility }}
+        model: ${{ inputs.model }}
+        direct-prompt: ${{ steps.prompt.outputs.prompt }}
+        publish-note: 'true'
+        max-turns: '3'
+        # A nonempty separator resolves to no allowed tools in the upstream action.
+        allowed-tools: ','

@@ -1,0 +1,24 @@
+# Paste into Notomate's workflow editor after publishing the action repository.
+name: Daily Lunch and Dinner Menu
+on:
+  schedule:
+    - cron: '0 0 * * *' # UTC = Asia/Taipei 08:00
+  workflow_dispatch:
+jobs:
+  meal-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: notomate/actions/actions/daily-meal-plan@v1
+        with:
+          notomate-base-url: ${{ vars.NM_API_BASE_URL }}
+          notomate-api-key: ${{ secrets.NM_API_KEY }}
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Alternatively replace anthropic-api-key with:
+          # claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          servings: '2'
+          dietary-preferences: Taiwanese home cooking, low oil, vegetables with every meal
+          excluded-ingredients: '' # Example: peanuts, shrimp
+          timezone: Asia/Taipei
+          note-visibility: private
+          # model: <a Claude model available to your account>

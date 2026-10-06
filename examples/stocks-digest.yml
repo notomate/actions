@@ -1,0 +1,19 @@
+# Paste into Notomate's workflow editor after publishing the action repository.
+# Set workspace variable STOCK_SYMBOLS, e.g. AAPL,MSFT,2330.TW
+name: Daily Stock Watchlist
+on:
+  schedule:
+    - cron: '0 1 * * *' # UTC = Asia/Taipei 09:00
+  workflow_dispatch:
+jobs:
+  stocks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: notomate/actions/actions/stocks-to-note@v1
+        with:
+          notomate-base-url: ${{ vars.NM_API_BASE_URL }}
+          notomate-api-key: ${{ secrets.NM_API_KEY }}
+          symbols: ${{ vars.STOCK_SYMBOLS }}
+          timezone: Asia/Taipei
+          note-visibility: private

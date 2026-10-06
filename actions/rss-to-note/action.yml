@@ -1,0 +1,51 @@
+name: Notomate RSS to Note
+description: Fetch an RSS or Atom feed and publish its latest entries as one Notomate note.
+inputs:
+  notomate-base-url:
+    description: Notomate origin reachable from the runner.
+    required: true
+  notomate-api-key:
+    description: Notomate personal API key.
+    required: true
+  note-visibility:
+    description: private, workspace or public.
+    default: private
+  timezone:
+    description: IANA time zone for the note date (does not change cron).
+    default: Asia/Taipei
+  feed-url:
+    description: RSS or Atom feed URL.
+    default: https://www.usnews.com/rss/news
+  max-items:
+    description: Maximum entries per note, from 1 to 100.
+    default: '10'
+outputs:
+  note-id:
+    description: ID of the created note; empty when skipped or publication is unconfirmed.
+    value: ${{ steps.run.outputs.note-id }}
+  conclusion:
+    description: success, skipped or failure.
+    value: ${{ steps.run.outputs.conclusion || 'failure' }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Install RSS dependencies
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: python -m pip install --disable-pip-version-check -r "$ACTION_PATH/../../requirements/rss.txt"
+    - name: Publish RSS digest
+      id: run
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        INPUT_NOTOMATE_BASE_URL: ${{ inputs.notomate-base-url }}
+        INPUT_NOTOMATE_API_KEY: ${{ inputs.notomate-api-key }}
+        INPUT_NOTE_VISIBILITY: ${{ inputs.note-visibility }}
+        INPUT_TIMEZONE: ${{ inputs.timezone }}
+        INPUT_FEED_URL: ${{ inputs.feed-url }}
+        INPUT_MAX_ITEMS: ${{ inputs.max-items }}
+      run: python "$ACTION_PATH/../../scripts/rss_to_note.py"
