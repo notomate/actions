@@ -1,0 +1,9 @@
+{
+  "name": "notomate-actions-claude",
+  "private": true,
+  "type": "module",
+  "description": "Claude Agent SDK bridge used by the claude and daily-meal-plan actions.",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.292"
+  }
+}

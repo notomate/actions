@@ -1,12 +1,15 @@
-"""Run the pinned Claude Code CLI with no tools and return its text response."""
+"""Run Claude through the Agent SDK bridge (sdk/claude.mjs) with no tools."""
 from __future__ import annotations
 
 import json
 import os
 import shutil
 import subprocess
+from pathlib import Path
 
 from common import ActionError, get_input
+
+BRIDGE = Path(__file__).resolve().parents[1] / "sdk" / "claude.mjs"
 
 
 def credentials(purpose: str) -> dict[str, str]:
@@ -19,19 +22,16 @@ def credentials(purpose: str) -> dict[str, str]:
     return found
 
 
-def _run(prompt: str, model: str, secrets: dict[str, str], extra_args: list[str]) -> dict:
-    claude = shutil.which("claude")
-    if not claude:
-        raise ActionError("The Claude Code CLI is not installed.")
-    # The child sees credentials but not the other action inputs.
+def _run(prompt: str, model: str, secrets: dict[str, str], schema: dict | None) -> dict:
+    node = shutil.which("node")
+    if not node:
+        raise ActionError("Node.js is required to run the Claude Agent SDK.")
+    # The bridge sees credentials but not the other action inputs.
     env = {key: value for key, value in os.environ.items() if not key.startswith("INPUT_")} | secrets
+    request = json.dumps({"prompt": prompt, "model": model, "schema": schema})
     try:
-        result = subprocess.run(
-            # With no tools, Claude can only answer; no turn limit is needed.
-            [claude, "--print", "--output-format", "json", "--tools", "", "--strict-mcp-config",
-             "--no-session-persistence", "--model", model, *extra_args],
-            input=prompt, env=env, capture_output=True, text=True, encoding="utf-8", timeout=600,
-        )
+        result = subprocess.run([node, str(BRIDGE)], input=request, env=env, capture_output=True, text=True,
+                                encoding="utf-8", timeout=600)
     except subprocess.TimeoutExpired:
         raise ActionError("Claude did not respond within 10 minutes.") from None
     try:
@@ -46,16 +46,15 @@ def _run(prompt: str, model: str, secrets: dict[str, str], extra_args: list[str]
 
 
 def generate(prompt: str, model: str, secrets: dict[str, str]) -> str:
-    text = str(_run(prompt, model, secrets, []).get("result") or "").strip()
+    text = str(_run(prompt, model, secrets, None).get("result") or "").strip()
     if not text:
         raise ActionError("Claude did not return a response (empty result).")
     return text
 
 
 def generate_structured(prompt: str, model: str, secrets: dict[str, str], schema: dict) -> dict:
-    """Return Claude's output after the CLI has validated it against the JSON Schema."""
-    response = _run(prompt, model, secrets, ["--json-schema", json.dumps(schema)])
-    data = response.get("structured_output")
+    """Return Claude's output after the SDK has validated it against the JSON Schema."""
+    data = _run(prompt, model, secrets, schema).get("structured_output")
     if not isinstance(data, dict):
         raise ActionError("Claude did not return a JSON object matching json-schema.")
     return data

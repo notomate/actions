@@ -50,9 +50,19 @@ runs:
     - uses: actions/setup-node@v4
       with:
         node-version: '22'
-    - name: Install Claude Code
+    - name: Cache Claude Agent SDK
+      id: sdk-cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.action_path }}/../../sdk/node_modules
+        # Bump with the SDK pin in sdk/package.json; hashFiles cannot read the action path.
+        key: ${{ runner.os }}-notomate-claude-agent-sdk-0.3.292
+    - name: Install Claude Agent SDK
+      if: steps.sdk-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.292
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: npm ci --omit=dev --no-fund --no-audit --prefix "$ACTION_PATH/../../sdk"
     - name: Generate recipes
       id: run
       shell: bash

@@ -125,7 +125,7 @@ By default, the action generates one English menu per day, covering lunch and di
 
 `data` fields: `date`, `servings`, `dietary_preferences`, `excluded_ingredients`, `language`, and `instructions`.
 
-The action installs a pinned Claude Code CLI (Node.js 22) and runs it in print mode with `--tools ""`, so Claude has no tools or MCP servers and can only return text. Credentials are passed only to that process. Dietary constraints are followed by the model without separate deterministic validation, and menus are not guaranteed to differ across days.
+The action runs Claude through the [Claude Agent SDK](sdk/claude.mjs) (pinned in `sdk/package.json`, Node.js 22) with `tools: []`, no MCP servers, and no filesystem settings, so Claude can only return text. `node_modules` is cached by SDK version with `actions/cache`. Credentials are passed only to that process. The SDK bridge is shared with the `claude` action. Dietary constraints are followed by the model without separate deterministic validation, and menus are not guaranteed to differ across days.
 
 If Claude returns an error or an empty response, the action fails without content and no note is written, consistent with the RSS and stock actions. Claude's error text is not logged; only the result type is reported.
 
@@ -151,7 +151,7 @@ If some symbols fail, the action outputs the successful data with a failure list
 
 ## Processing with Claude
 
-Place `claude` between a content action and `write-note` to translate, summarize, or rewrite the data. Claude runs with all tools disabled and only returns text, like the meal plan.
+Place `claude` between a content action and `write-note` to translate, summarize, or rewrite the data. Claude runs through the same Agent SDK bridge as the meal plan, with all tools disabled, and only returns text.
 
 | Input | Default / description |
 | --- | --- |
@@ -159,12 +159,12 @@ Place `claude` between a content action and `write-note` to translate, summarize
 | `prompt` | Required; your instructions, e.g. `Translate every item's title and summary into Traditional Chinese (Taiwan).` |
 | `data` | `{}`; the JSON to process, usually `${{ steps.<id>.outputs.data }}` |
 | `output-format` | `markdown` (default without `json-schema`): Claude writes the note body, which replaces `content` in the input data. `json`: Claude returns a JSON object that becomes `data`, keeping the input's structure unless your prompt says otherwise |
-| `json-schema` | None; a JSON Schema whose root is `"type": "object"`. Claude Code validates Claude's output against it, and the step fails if no matching object is returned. Implies `output-format: json` |
+| `json-schema` | None; a JSON Schema whose root is `"type": "object"`. The Agent SDK's structured output validates Claude's output against it, and the step fails if no matching object is returned. Implies `output-format: json` |
 | `model` | `claude-sonnet-5` |
 
 Outputs match the content actions: `title`, `content`, `data`, and `conclusion`. Use `json` when the `write-note` template loops over fields such as RSS `items`. [examples/rss-translated.yml](examples/rss-translated.yml) translates each item and keeps the same loop template. Use `markdown` for a free-form summary published with the default `{{ content }}` template.
 
-Without `json-schema`, `json` mode relies on the prompt: the step fails only if the reply is not a JSON object, so a renamed or missing field surfaces later as a `write-note` template error. Add `json-schema` listing the fields your template uses, as the example does, so the structure is enforced by the Claude Code CLI's structured output instead.
+Without `json-schema`, `json` mode relies on the prompt: the step fails only if the reply is not a JSON object, so a renamed or missing field surfaces later as a `write-note` template error. Add `json-schema` listing the fields your template uses, as the example does, so the structure is enforced by the Agent SDK's structured output instead.
 
 The data is sent to Claude in full, including the default `content`. Ask Claude to drop fields you do not need, as the example does, to save tokens. Feed text is sent to Claude as data, and the prompt tells Claude to ignore instructions inside it. That is not a guarantee: a malicious feed can still steer the generated text, though with no tools it cannot do anything else. Invalid JSON in `json` mode fails the step before `write-note` runs. Guard `claude` with the same `if:` as `write-note` when the source can conclude `skipped`.
 

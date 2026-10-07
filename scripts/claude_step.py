@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 
-from claude_cli import credentials, generate, generate_structured
+from claude_sdk import credentials, generate, generate_structured
 from common import ActionError, get_input, note_outputs, output, parse_data, run
 
 FORMATS = {

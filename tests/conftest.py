@@ -70,9 +70,10 @@ def server():
         thread.join()
 
 
-FAKE_CLAUDE = """import json, os, sys
-prompt = sys.stdin.read()
-record = {"args": sys.argv[1:], "prompt": prompt, "env": sorted(k for k in os.environ if k.startswith("INPUT_")),
+FAKE_NODE = """import json, os, sys
+request = json.loads(sys.stdin.read())
+record = {"args": sys.argv[1:], "prompt": request["prompt"], "model": request["model"], "schema": request["schema"],
+          "env": sorted(k for k in os.environ if k.startswith("INPUT_")),
           "api_key": os.environ.get("ANTHROPIC_API_KEY"), "oauth": os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")}
 open(os.environ["FAKE_CLAUDE_RECORD"], "w", encoding="utf-8").write(json.dumps(record))
 print(json.dumps(json.loads(os.environ["FAKE_CLAUDE_RESPONSE"])))
@@ -82,15 +83,15 @@ sys.exit(int(os.environ.get("FAKE_CLAUDE_EXIT", "0")))
 
 @pytest.fixture
 def fake_claude(monkeypatch, tmp_path):
-    """Put a recording `claude` executable first on PATH."""
+    """Put a recording `node` first on PATH in place of the Agent SDK bridge."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    (bin_dir / "fake_claude.py").write_text(FAKE_CLAUDE, encoding="utf-8")
+    (bin_dir / "fake_node.py").write_text(FAKE_NODE, encoding="utf-8")
     if os.name == "nt":
-        (bin_dir / "claude.cmd").write_text(f'@"{sys.executable}" "%~dp0fake_claude.py" %*\n', encoding="utf-8")
+        (bin_dir / "node.cmd").write_text(f'@"{sys.executable}" "%~dp0fake_node.py" %*\n', encoding="utf-8")
     else:
-        launcher = bin_dir / "claude"
-        launcher.write_text(f'#!/bin/sh\nexec "{sys.executable}" "$(dirname "$0")/fake_claude.py" "$@"\n', encoding="utf-8")
+        launcher = bin_dir / "node"
+        launcher.write_text(f'#!/bin/sh\nexec "{sys.executable}" "$(dirname "$0")/fake_node.py" "$@"\n', encoding="utf-8")
         launcher.chmod(0o755)
     record = tmp_path / "claude-record.json"
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")

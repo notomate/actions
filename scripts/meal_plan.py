@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from claude_cli import credentials, generate
+from claude_sdk import credentials, generate
 from common import ActionError, get_input, note_outputs, now_in, output, positive_int, run, timezone_input
 
 DEFAULT_PREFERENCES = "Taiwanese home cooking, with both meat and vegetables"

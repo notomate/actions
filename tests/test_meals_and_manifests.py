@@ -27,7 +27,7 @@ def test_meal_prompt_respects_timezone_and_preferences(environment, outputs, fak
     assert "2026-10-06" in call["prompt"]
     assert '"servings": 4' in call["prompt"] and "Vegan" in call["prompt"] and "peanuts, shrimp" in call["prompt"]
     assert "shopping list" in call["prompt"] and "test-anthropic-secret" not in call["prompt"]
-    assert call["args"][call["args"].index("--tools") + 1] == ""
+    assert call["args"][0].endswith("claude.mjs") and call["schema"] is None
     assert call["api_key"] == "test-anthropic-secret" and call["oauth"] is None and call["env"] == []
     values = outputs()
     assert values["title"] == "2026-10-06 Lunch and Dinner Menu" and values["content"] == "## Lunch\nRice"
@@ -125,7 +125,7 @@ def test_manifests_bind_inputs_outputs_and_existing_scripts():
                 assert step["shell"] == "bash"
                 assert "${{" not in step["run"]  # Inputs are passed through env, never interpolated into code.
                 for path in re.findall(r'\$ACTION_PATH/([^"\s]+)', step["run"]):
-                    assert (file.parent / path).resolve().is_file()
+                    assert (file.parent / path).resolve().exists()
         assert referenced == set(action["inputs"])
 
 
@@ -163,8 +163,16 @@ def test_examples_match_action_interfaces_and_cron():
 
 
 @pytest.mark.parametrize("name", ["daily-meal-plan", "claude"])
-def test_claude_cli_is_pinned(name):
-    action = load(ROOT / "actions" / name / "action.yml")
-    install = next(step for step in action["runs"]["steps"] if step.get("name") == "Install Claude Code")
-    assert re.search(r"@anthropic-ai/claude-code@\d+\.\d+\.\d+$", install["run"].strip())
-    assert not any("claude-notomate-action" in step.get("uses", "") for step in action["runs"]["steps"])
+def test_claude_agent_sdk_is_pinned_and_cached(name):
+    package = json.loads((ROOT / "sdk/package.json").read_text(encoding="utf-8"))
+    version = package["dependencies"]["@anthropic-ai/claude-agent-sdk"]
+    assert re.fullmatch(r"\d+\.\d+\.\d+", version)
+    lock = json.loads((ROOT / "sdk/package-lock.json").read_text(encoding="utf-8"))
+    assert lock["packages"]["node_modules/@anthropic-ai/claude-agent-sdk"]["version"] == version
+    steps = load(ROOT / "actions" / name / "action.yml")["runs"]["steps"]
+    cache = next(step for step in steps if step.get("id") == "sdk-cache")
+    # The cache key cannot hash the lockfile, so it must name the pinned version.
+    assert cache["with"]["key"].endswith(f"-claude-agent-sdk-{version}")
+    install = next(step for step in steps if step.get("name") == "Install Claude Agent SDK")
+    assert install["run"].startswith("npm ci ") and install["if"] == "steps.sdk-cache.outputs.cache-hit != 'true'"
+    assert not any("claude-notomate-action" in step.get("uses", "") for step in steps)
