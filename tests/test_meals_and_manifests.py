@@ -15,34 +15,6 @@ import meal_plan
 
 ROOT = Path(__file__).resolve().parents[1]
 
-FAKE_CLAUDE = """import json, os, sys
-prompt = sys.stdin.read()
-record = {"args": sys.argv[1:], "prompt": prompt, "env": sorted(k for k in os.environ if k.startswith("INPUT_")),
-          "api_key": os.environ.get("ANTHROPIC_API_KEY"), "oauth": os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")}
-open(os.environ["FAKE_CLAUDE_RECORD"], "w", encoding="utf-8").write(json.dumps(record))
-print(json.dumps(json.loads(os.environ["FAKE_CLAUDE_RESPONSE"])))
-sys.exit(int(os.environ.get("FAKE_CLAUDE_EXIT", "0")))
-"""
-
-
-@pytest.fixture
-def fake_claude(monkeypatch, tmp_path):
-    """Put a recording `claude` executable first on PATH."""
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    (bin_dir / "fake_claude.py").write_text(FAKE_CLAUDE, encoding="utf-8")
-    if os.name == "nt":
-        (bin_dir / "claude.cmd").write_text(f'@"{sys.executable}" "%~dp0fake_claude.py" %*\n', encoding="utf-8")
-    else:
-        launcher = bin_dir / "claude"
-        launcher.write_text(f'#!/bin/sh\nexec "{sys.executable}" "$(dirname "$0")/fake_claude.py" "$@"\n', encoding="utf-8")
-        launcher.chmod(0o755)
-    record = tmp_path / "claude-record.json"
-    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
-    monkeypatch.setenv("FAKE_CLAUDE_RECORD", str(record))
-    monkeypatch.setenv("FAKE_CLAUDE_RESPONSE", json.dumps({"type": "result", "subtype": "success", "is_error": False, "result": "## Lunch\nRice\n"}))
-    return lambda: json.loads(record.read_text(encoding="utf-8"))
-
 
 def test_meal_prompt_respects_timezone_and_preferences(environment, outputs, fake_claude, monkeypatch):
     monkeypatch.setattr(meal_plan, "now_in", lambda zone: datetime(2026, 10, 5, 17, tzinfo=ZoneInfo("UTC")).astimezone(zone))
@@ -169,25 +141,30 @@ def test_only_write_note_publishes():
 
 
 def test_examples_match_action_interfaces_and_cron():
-    expected = {"rss-digest.yml": "0 23 * * *", "daily-meal-plan.yml": "0 0 * * *", "stocks-digest.yml": "0 1 * * *"}
+    expected = {"rss-digest.yml": "0 23 * * *", "rss-translated.yml": "0 23 * * *", "daily-meal-plan.yml": "0 0 * * *",
+                "stocks-digest.yml": "0 1 * * *"}
+    assert {file.name for file in (ROOT / "examples").glob("*.yml")} == set(expected)
     for file in (ROOT / "examples").glob("*.yml"):
         workflow = load(file)
         assert "workflow_dispatch" in workflow["on"]
         assert workflow["on"]["schedule"][0]["cron"] == expected[file.name]
         for job in workflow["jobs"].values():
-            source, publisher = job["steps"]
-            for step in job["steps"]:
+            steps = job["steps"]
+            for step in steps:
                 path = step["uses"].split("@", 1)[0].split("/", 2)[2]
                 action = load(ROOT / path / "action.yml")
                 assert set(step["with"]) <= set(action["inputs"])
                 required = {key for key, value in action["inputs"].items() if value.get("required") == "true"}
                 assert required <= set(step["with"])
-            assert publisher["uses"].startswith("notomate/actions/actions/write-note@")
-            assert publisher["with"]["data"] == f"${{{{ steps.{source['id']}.outputs.data }}}}"
+            # Each step after the first consumes the data of the step before it.
+            for previous, step in zip(steps, steps[1:]):
+                assert step["with"]["data"] == f"${{{{ steps.{previous['id']}.outputs.data }}}}"
+            assert steps[-1]["uses"].startswith("notomate/actions/actions/write-note@")
 
 
-def test_meal_cli_is_pinned_without_tools():
-    action = load(ROOT / "actions/daily-meal-plan/action.yml")
+@pytest.mark.parametrize("name", ["daily-meal-plan", "claude"])
+def test_claude_cli_is_pinned(name):
+    action = load(ROOT / "actions" / name / "action.yml")
     install = next(step for step in action["runs"]["steps"] if step.get("name") == "Install Claude Code")
     assert re.search(r"@anthropic-ai/claude-code@\d+\.\d+\.\d+$", install["run"].strip())
     assert not any("claude-notomate-action" in step.get("uses", "") for step in action["runs"]["steps"])

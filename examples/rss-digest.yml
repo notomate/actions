@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: notomate/actions/actions/rss-to-note@v1
+      - uses: notomate/actions/actions/rss@v1
         id: rss
         with:
           feed-url: https://www.usnews.com/rss/news

@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: notomate/actions/actions/stocks-to-note@v1
+      - uses: notomate/actions/actions/stocks@v1
         id: stocks
         with:
           symbols: ${{ vars.STOCK_SYMBOLS }}

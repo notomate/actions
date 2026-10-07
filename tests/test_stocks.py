@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 import yfinance as yf
 
-import stocks_to_note as stocks
+import stocks
 from common import ActionError
 
 

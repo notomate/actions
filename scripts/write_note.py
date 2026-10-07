@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import json
-
 from jinja2 import StrictUndefined, TemplateError
 from jinja2.sandbox import SandboxedEnvironment
 
-from common import ActionError, Settings, get_input, markdown_escape, output, publish, run
+from common import ActionError, Settings, get_input, markdown_escape, output, parse_data, publish, run
 
 
 def number(value, spec: str = ",.2f", missing: str = "N/A") -> str:
@@ -23,16 +21,6 @@ def environment() -> SandboxedEnvironment:
                                trim_blocks=True, lstrip_blocks=True)
     env.filters.update(md=lambda value: markdown_escape(str(value)), md_cell=table_cell, number=number)
     return env
-
-
-def parse_data(value: str) -> dict:
-    try:
-        data = json.loads(value or "{}")
-    except ValueError:
-        raise ActionError("data must be a JSON object.") from None
-    if not isinstance(data, dict):
-        raise ActionError("data must be a JSON object.")
-    return data
 
 
 def render(title_template: str, content_template: str, data: dict) -> tuple[str, str]:

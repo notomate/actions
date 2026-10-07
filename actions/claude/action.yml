@@ -1,0 +1,58 @@
+name: Notomate Claude
+description: Process another step's data with Claude (translate, summarize, rewrite) and output note content for write-note.
+inputs:
+  anthropic-api-key:
+    description: Anthropic API key; provide this or claude-code-oauth-token.
+    required: false
+  claude-code-oauth-token:
+    description: Claude Code OAuth token; alternative to anthropic-api-key.
+    required: false
+  prompt:
+    description: Instructions for Claude, e.g. "Translate titles and summaries into Traditional Chinese (Taiwan)."
+    required: true
+  data:
+    description: JSON object to process, usually another action's data output.
+    default: '{}'
+  output-format:
+    description: markdown (Claude writes the note body) or json (Claude returns data with the input's structure).
+    default: markdown
+  model:
+    description: Claude model ID or alias.
+    default: claude-sonnet-5
+outputs:
+  title:
+    description: The data's title, if any.
+    value: ${{ steps.run.outputs.title }}
+  content:
+    description: Claude's Markdown, or the content field of its JSON.
+    value: ${{ steps.run.outputs.content }}
+  data:
+    description: JSON template data; the input data with content replaced, or Claude's JSON object.
+    value: ${{ steps.run.outputs.data }}
+  conclusion:
+    description: success or failure.
+    value: ${{ steps.run.outputs.conclusion || 'failure' }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Install Claude Code
+      shell: bash
+      run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.292
+    - name: Run Claude
+      id: run
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        INPUT_ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        INPUT_CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-code-oauth-token }}
+        INPUT_PROMPT: ${{ inputs.prompt }}
+        INPUT_DATA: ${{ inputs.data }}
+        INPUT_OUTPUT_FORMAT: ${{ inputs.output-format }}
+        INPUT_MODEL: ${{ inputs.model }}
+      run: python "$ACTION_PATH/../../scripts/claude_step.py"

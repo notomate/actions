@@ -10,10 +10,11 @@ import pandas as pd
 import pytest
 import yaml
 
-import stocks_to_note as stocks
+import common
+import stocks
 import write_note
 from common import ActionError
-from rss_to_note import render_feed
+from rss import render_feed
 
 ROOT = Path(__file__).resolve().parents[1]
 NOW = datetime(2026, 10, 6, 9, tzinfo=ZoneInfo("Asia/Taipei"))
@@ -83,7 +84,7 @@ def test_template_errors(title, template, data, match):
 @pytest.mark.parametrize("value", ["not json", "[1]", '"text"'])
 def test_data_must_be_object(value):
     with pytest.raises(ActionError, match="JSON object"):
-        write_note.parse_data(value)
+        common.parse_data(value)
 
 
 def test_write_note_entrypoint_publishes_once(outputs, server, tmp_path):

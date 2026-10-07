@@ -1,4 +1,4 @@
-name: Notomate RSS to Note
+name: Notomate RSS
 description: Fetch an RSS or Atom feed and output its latest entries as note content for write-note.
 inputs:
   timezone:
@@ -42,4 +42,4 @@ runs:
         INPUT_TIMEZONE: ${{ inputs.timezone }}
         INPUT_FEED_URL: ${{ inputs.feed-url }}
         INPUT_MAX_ITEMS: ${{ inputs.max-items }}
-      run: python "$ACTION_PATH/../../scripts/rss_to_note.py"
+      run: python "$ACTION_PATH/../../scripts/rss.py"

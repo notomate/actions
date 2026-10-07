@@ -98,6 +98,16 @@ def markdown_escape(text: str) -> str:
     return re.sub(r"([\\`*_{}\[\]()<>#+.!|~-])", r"\\\1", text)
 
 
+def parse_data(value: str) -> dict:
+    try:
+        data = json.loads(value or "{}")
+    except ValueError:
+        raise ActionError("data must be a JSON object.") from None
+    if not isinstance(data, dict):
+        raise ActionError("data must be a JSON object.")
+    return data
+
+
 def note_outputs(title: str, content: str, data: dict) -> None:
     """Expose a rendered note and its template data; write-note publishes them."""
     output("title", title)

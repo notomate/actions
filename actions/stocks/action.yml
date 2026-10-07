@@ -1,4 +1,4 @@
-name: Notomate Stocks to Note
+name: Notomate Stocks
 description: Fetch configured Yahoo Finance symbols with yfinance and output a daily-price note for write-note.
 inputs:
   timezone:
@@ -38,4 +38,4 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
         INPUT_TIMEZONE: ${{ inputs.timezone }}
         INPUT_SYMBOLS: ${{ inputs.symbols }}
-      run: python "$ACTION_PATH/../../scripts/stocks_to_note.py"
+      run: python "$ACTION_PATH/../../scripts/stocks.py"

@@ -1,4 +1,6 @@
 import json
+import os
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -66,3 +68,32 @@ def server():
         httpd.shutdown()
         httpd.server_close()
         thread.join()
+
+
+FAKE_CLAUDE = """import json, os, sys
+prompt = sys.stdin.read()
+record = {"args": sys.argv[1:], "prompt": prompt, "env": sorted(k for k in os.environ if k.startswith("INPUT_")),
+          "api_key": os.environ.get("ANTHROPIC_API_KEY"), "oauth": os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")}
+open(os.environ["FAKE_CLAUDE_RECORD"], "w", encoding="utf-8").write(json.dumps(record))
+print(json.dumps(json.loads(os.environ["FAKE_CLAUDE_RESPONSE"])))
+sys.exit(int(os.environ.get("FAKE_CLAUDE_EXIT", "0")))
+"""
+
+
+@pytest.fixture
+def fake_claude(monkeypatch, tmp_path):
+    """Put a recording `claude` executable first on PATH."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "fake_claude.py").write_text(FAKE_CLAUDE, encoding="utf-8")
+    if os.name == "nt":
+        (bin_dir / "claude.cmd").write_text(f'@"{sys.executable}" "%~dp0fake_claude.py" %*\n', encoding="utf-8")
+    else:
+        launcher = bin_dir / "claude"
+        launcher.write_text(f'#!/bin/sh\nexec "{sys.executable}" "$(dirname "$0")/fake_claude.py" "$@"\n', encoding="utf-8")
+        launcher.chmod(0o755)
+    record = tmp_path / "claude-record.json"
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("FAKE_CLAUDE_RECORD", str(record))
+    monkeypatch.setenv("FAKE_CLAUDE_RESPONSE", json.dumps({"type": "result", "subtype": "success", "is_error": False, "result": "## Lunch\nRice\n"}))
+    return lambda: json.loads(record.read_text(encoding="utf-8"))

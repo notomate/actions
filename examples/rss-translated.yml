@@ -1,0 +1,50 @@
+# Paste into Notomate's workflow editor after publishing the action repository.
+name: Daily Translated RSS Digest
+on:
+  schedule:
+    - cron: '0 23 * * *' # UTC = Asia/Taipei next day 07:00
+  workflow_dispatch:
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: notomate/actions/actions/rss@v1
+        id: rss
+        with:
+          feed-url: https://www.usnews.com/rss/news
+          max-items: '10'
+          timezone: Asia/Taipei
+      - uses: notomate/actions/actions/claude@v1
+        id: translate
+        # An empty feed concludes skipped without data.
+        if: steps.rss.outputs.conclusion == 'success'
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          data: ${{ steps.rss.outputs.data }}
+          # json keeps the item list, so write-note can still loop over it.
+          output-format: json
+          prompt: |
+            Translate every item's title and summary into Traditional Chinese (Taiwan).
+            Translate feed_title too. Drop the content field. Keep links, dates and all other values unchanged.
+      - uses: notomate/actions/actions/write-note@v1
+        if: steps.rss.outputs.conclusion == 'success'
+        with:
+          notomate-base-url: ${{ vars.NM_API_BASE_URL }}
+          notomate-api-key: ${{ secrets.NM_API_KEY }}
+          note-visibility: private
+          data: ${{ steps.translate.outputs.data }}
+          title: '{{ date }} {{ feed_title }} 新聞摘要'
+          template: |
+            擷取時間：{{ retrieved_at }}
+
+            {% for item in items %}
+            ## {{ item.title | md }}
+
+            {{ item.summary | md }}
+
+            {% if item.link %}
+            [原文連結](<{{ item.link }}>)
+
+            {% endif %}
+            {% endfor %}

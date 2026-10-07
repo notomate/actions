@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from common import ActionError
-from rss_to_note import render_feed
+from rss import render_feed
 
 NOW = datetime(2026, 10, 6, 7, tzinfo=ZoneInfo("Asia/Taipei"))
 
@@ -68,7 +68,7 @@ def test_empty_feed_skips():
 def test_rss_entrypoint_outputs_without_publishing(outputs, server, tmp_path, empty):
     server["feed"] = rss() if empty else rss('<item><title>Hello</title><description>World</description></item>')
     env = dict(os.environ, INPUT_FEED_URL=server["url"] + "/rss")
-    script = Path(__file__).resolve().parents[1] / "scripts/rss_to_note.py"
+    script = Path(__file__).resolve().parents[1] / "scripts/rss.py"
     result = subprocess.run([sys.executable, str(script)], cwd=tmp_path, env=env, capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
     assert not server["posts"]
@@ -84,7 +84,7 @@ def test_rss_entrypoint_outputs_without_publishing(outputs, server, tmp_path, em
 def test_bad_feed_entrypoint_fails(outputs, server, tmp_path):
     server["feed"] = b"<html>not a feed</html>"
     env = dict(os.environ, INPUT_FEED_URL=server["url"] + "/rss")
-    script = Path(__file__).resolve().parents[1] / "scripts/rss_to_note.py"
+    script = Path(__file__).resolve().parents[1] / "scripts/rss.py"
     result = subprocess.run([sys.executable, str(script)], cwd=tmp_path, env=env, capture_output=True, text=True)
     assert result.returncode == 1
     assert outputs() == {"conclusion": "failure"}

@@ -6,7 +6,7 @@ jobs:
   rss:
     runs-on: ubuntu-latest
     steps:
-      - uses: ./actions/rss-to-note
+      - uses: ./actions/rss
         id: rss
         with:
           feed-url: ${{ env.MOCK_ORIGIN }}/feed
