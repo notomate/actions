@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 
-from claude_cli import credentials, generate
+from claude_cli import credentials, generate, generate_structured
 from common import ActionError, get_input, note_outputs, output, parse_data, run
 
 FORMATS = {
@@ -35,19 +35,37 @@ def parse_object(text: str) -> dict:
     return result
 
 
+def parse_schema(value: str) -> dict | None:
+    if not value:
+        return None
+    try:
+        schema = json.loads(value)
+    except ValueError:
+        raise ActionError("json-schema must be valid JSON.") from None
+    if not isinstance(schema, dict) or schema.get("type") != "object":
+        raise ActionError('json-schema must be a JSON Schema object with "type": "object".')
+    return schema
+
+
 def main():
     secrets = credentials("the Claude step")
     instructions = get_input("prompt", required=True)
-    output_format = get_input("output-format", "markdown")
+    schema = parse_schema(get_input("json-schema"))
+    output_format = get_input("output-format", "json" if schema else "markdown")
     if output_format not in FORMATS:
         raise ActionError("output-format must be markdown or json.")
+    if schema and output_format != "json":
+        raise ActionError("json-schema requires output-format json.")
     data = parse_data(get_input("data"))
-    result = generate(build_prompt(instructions, data, output_format), get_input("model", "claude-sonnet-5"), secrets)
-    if output_format == "json":
-        data = parse_object(result)
+    prompt, model = build_prompt(instructions, data, output_format), get_input("model", "claude-sonnet-5")
+    if schema:
+        data = generate_structured(prompt, model, secrets, schema)
+        content = data.get("content", "")
+    elif output_format == "json":
+        data = parse_object(generate(prompt, model, secrets))
         content = data.get("content", "")
     else:
-        content = result
+        content = generate(prompt, model, secrets)
     note_outputs(str(data.get("title", "")), str(content), data)
     output("conclusion", "success")
 

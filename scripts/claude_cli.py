@@ -19,7 +19,7 @@ def credentials(purpose: str) -> dict[str, str]:
     return found
 
 
-def generate(prompt: str, model: str, secrets: dict[str, str]) -> str:
+def _run(prompt: str, model: str, secrets: dict[str, str], extra_args: list[str]) -> dict:
     claude = shutil.which("claude")
     if not claude:
         raise ActionError("The Claude Code CLI is not installed.")
@@ -29,7 +29,7 @@ def generate(prompt: str, model: str, secrets: dict[str, str]) -> str:
         result = subprocess.run(
             # With no tools, Claude can only answer; no turn limit is needed.
             [claude, "--print", "--output-format", "json", "--tools", "", "--strict-mcp-config",
-             "--no-session-persistence", "--model", model],
+             "--no-session-persistence", "--model", model, *extra_args],
             input=prompt, env=env, capture_output=True, text=True, encoding="utf-8", timeout=600,
         )
     except subprocess.TimeoutExpired:
@@ -39,7 +39,23 @@ def generate(prompt: str, model: str, secrets: dict[str, str]) -> str:
     except ValueError:
         response = None
     # Claude's error text can echo request details; report only the result subtype.
-    if result.returncode or not isinstance(response, dict) or response.get("is_error") or not str(response.get("result") or "").strip():
+    if result.returncode or not isinstance(response, dict) or response.get("is_error"):
         subtype = response.get("subtype") if isinstance(response, dict) else None
         raise ActionError(f"Claude did not return a response ({subtype or 'no result'}).")
-    return response["result"].strip()
+    return response
+
+
+def generate(prompt: str, model: str, secrets: dict[str, str]) -> str:
+    text = str(_run(prompt, model, secrets, []).get("result") or "").strip()
+    if not text:
+        raise ActionError("Claude did not return a response (empty result).")
+    return text
+
+
+def generate_structured(prompt: str, model: str, secrets: dict[str, str], schema: dict) -> dict:
+    """Return Claude's output after the CLI has validated it against the JSON Schema."""
+    response = _run(prompt, model, secrets, ["--json-schema", json.dumps(schema)])
+    data = response.get("structured_output")
+    if not isinstance(data, dict):
+        raise ActionError("Claude did not return a JSON object matching json-schema.")
+    return data

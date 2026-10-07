@@ -158,10 +158,13 @@ Place `claude` between a content action and `write-note` to translate, summarize
 | `anthropic-api-key` / `claude-code-oauth-token` | Provide one |
 | `prompt` | Required; your instructions, e.g. `Translate every item's title and summary into Traditional Chinese (Taiwan).` |
 | `data` | `{}`; the JSON to process, usually `${{ steps.<id>.outputs.data }}` |
-| `output-format` | `markdown`: Claude writes the note body, which replaces `content` in the input data. `json`: Claude returns a JSON object that becomes `data`, keeping the input's structure unless your prompt says otherwise |
+| `output-format` | `markdown` (default without `json-schema`): Claude writes the note body, which replaces `content` in the input data. `json`: Claude returns a JSON object that becomes `data`, keeping the input's structure unless your prompt says otherwise |
+| `json-schema` | None; a JSON Schema whose root is `"type": "object"`. Claude Code validates Claude's output against it, and the step fails if no matching object is returned. Implies `output-format: json` |
 | `model` | `claude-sonnet-5` |
 
 Outputs match the content actions: `title`, `content`, `data`, and `conclusion`. Use `json` when the `write-note` template loops over fields such as RSS `items`. [examples/rss-translated.yml](examples/rss-translated.yml) translates each item and keeps the same loop template. Use `markdown` for a free-form summary published with the default `{{ content }}` template.
+
+Without `json-schema`, `json` mode relies on the prompt: the step fails only if the reply is not a JSON object, so a renamed or missing field surfaces later as a `write-note` template error. Add `json-schema` listing the fields your template uses, as the example does, so the structure is enforced by the Claude Code CLI's structured output instead.
 
 The data is sent to Claude in full, including the default `content`. Ask Claude to drop fields you do not need, as the example does, to save tokens. Feed text is sent to Claude as data, and the prompt tells Claude to ignore instructions inside it. That is not a guarantee: a malicious feed can still steer the generated text, though with no tools it cannot do anything else. Invalid JSON in `json` mode fails the step before `write-note` runs. Guard `claude` with the same `if:` as `write-note` when the source can conclude `skipped`.
 
@@ -210,4 +213,4 @@ For a real Notomate smoke test, publish an action ref, configure the variables a
 - The specified US News URL timed out on all three attempts from the current network. Mock feed tests do not establish availability of that source.
 - Real Claude generation and publication to a Notomate workspace have not been tested. The repository has not been pushed or tagged as `v1`.
 
-These results predate the split into content actions and `write-note`. Since then, the 90 Windows tests pass; the Linux, `act`, and live checks above have not been rerun.
+These results predate the split into content actions and `write-note`. Since then, the 97 Windows tests pass; the Linux, `act`, and live checks above have not been rerun.

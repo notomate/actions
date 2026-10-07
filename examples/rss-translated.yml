@@ -22,11 +22,33 @@ jobs:
         with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           data: ${{ steps.rss.outputs.data }}
-          # json keeps the item list, so write-note can still loop over it.
-          output-format: json
           prompt: |
             Translate every item's title and summary into Traditional Chinese (Taiwan).
             Translate feed_title too. Drop the content field. Keep links, dates and all other values unchanged.
+          # Guarantees the fields the template below uses; implies output-format json.
+          json-schema: |
+            {
+              "type": "object",
+              "required": ["date", "retrieved_at", "feed_title", "items"],
+              "properties": {
+                "date": {"type": "string"},
+                "retrieved_at": {"type": "string"},
+                "feed_title": {"type": "string"},
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["title", "summary", "link"],
+                    "properties": {
+                      "title": {"type": "string"},
+                      "summary": {"type": "string"},
+                      "link": {"type": "string"},
+                      "published": {"type": ["string", "null"]}
+                    }
+                  }
+                }
+              }
+            }
       - uses: notomate/actions/actions/write-note@v1
         if: steps.rss.outputs.conclusion == 'success'
         with:

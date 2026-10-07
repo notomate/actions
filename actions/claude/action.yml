@@ -14,8 +14,11 @@ inputs:
     description: JSON object to process, usually another action's data output.
     default: '{}'
   output-format:
-    description: markdown (Claude writes the note body) or json (Claude returns data with the input's structure).
-    default: markdown
+    description: markdown (Claude writes the note body) or json (Claude returns data with the input's structure); defaults to json with json-schema, otherwise markdown.
+    required: false
+  json-schema:
+    description: Optional JSON Schema (root type object) that Claude's JSON output must match; validated by the Claude Code CLI.
+    required: false
   model:
     description: Claude model ID or alias.
     default: claude-sonnet-5
@@ -54,5 +57,6 @@ runs:
         INPUT_PROMPT: ${{ inputs.prompt }}
         INPUT_DATA: ${{ inputs.data }}
         INPUT_OUTPUT_FORMAT: ${{ inputs.output-format }}
+        INPUT_JSON_SCHEMA: ${{ inputs.json-schema }}
         INPUT_MODEL: ${{ inputs.model }}
       run: python "$ACTION_PATH/../../scripts/claude_step.py"

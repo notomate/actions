@@ -33,6 +33,9 @@ def render(title_template: str, content_template: str, data: dict) -> tuple[str,
     title = " ".join(title.split())
     if not title:
         raise ActionError("The rendered note title is empty.")
+    if not content.strip():
+        # e.g. the default {{ content }} after a claude step that dropped the content field.
+        raise ActionError("The rendered note body is empty; set template or check that data has content.")
     return title, content
 
 

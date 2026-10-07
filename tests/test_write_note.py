@@ -74,6 +74,8 @@ def test_number_filter_handles_missing_values():
     ("{{ title }}", "{{ missing }}", {"title": "t"}, "missing"),
     ("{{ title }}", "{% for x in %}", {"title": "t"}, "template failed"),
     ("  {{ blank }} ", "body", {"blank": ""}, "title is empty"),
+    ("{{ title }}", "{{ content }}", {"title": "t", "content": ""}, "body is empty"),
+    ("{{ title }}", "{% for i in items %}{{ i }}{% endfor %}\n", {"title": "t", "items": []}, "body is empty"),
     ("t", "{{ ''.__class__.__mro__ }}", {}, "template failed"),
 ])
 def test_template_errors(title, template, data, match):

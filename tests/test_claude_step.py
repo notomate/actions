@@ -53,6 +53,39 @@ def test_json_output_keeps_structure_for_templates(environment, outputs, fake_cl
     assert body == "- 你好\n"
 
 
+SCHEMA = {"type": "object", "required": ["items"], "properties": {"items": {"type": "array"}}}
+
+
+def test_json_schema_uses_cli_structured_output(environment, outputs, fake_claude, inputs, monkeypatch):
+    structured = {"feed_title": "新聞", "items": [{"title": "你好"}]}
+    monkeypatch.setenv("FAKE_CLAUDE_RESPONSE", json.dumps({"type": "result", "subtype": "success", "is_error": False,
+                                                           "result": "ignored", "structured_output": structured}))
+    monkeypatch.setenv("INPUT_JSON_SCHEMA", json.dumps(SCHEMA))
+    claude_step.main()
+    args = fake_claude()["args"]
+    assert json.loads(args[args.index("--json-schema") + 1]) == SCHEMA
+    assert json.loads(outputs()["data"]) == {**structured, "title": "", "content": ""}
+
+
+def test_json_schema_without_structured_output_fails(environment, outputs, fake_claude, inputs, monkeypatch):
+    respond(monkeypatch, '{"items": []}')
+    monkeypatch.setenv("INPUT_JSON_SCHEMA", json.dumps(SCHEMA))
+    with pytest.raises(ActionError, match="json-schema"):
+        claude_step.main()
+    assert "data" not in outputs()
+
+
+@pytest.mark.parametrize("schema,output_format,match", [
+    ("not json", "", "valid JSON"), ('{"type": "array"}', "", '"type": "object"'),
+    (json.dumps(SCHEMA), "markdown", "requires output-format json"),
+])
+def test_invalid_json_schema(environment, inputs, monkeypatch, schema, output_format, match):
+    monkeypatch.setenv("INPUT_JSON_SCHEMA", schema)
+    monkeypatch.setenv("INPUT_OUTPUT_FORMAT", output_format)
+    with pytest.raises(ActionError, match=match):
+        claude_step.main()
+
+
 @pytest.mark.parametrize("result", ["not json", "[1, 2]"])
 def test_invalid_json_fails_without_outputs(environment, outputs, fake_claude, inputs, monkeypatch, result):
     respond(monkeypatch, result)
