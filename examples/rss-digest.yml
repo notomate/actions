@@ -11,10 +11,28 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: notomate/actions/actions/rss-to-note@v1
+        id: rss
         with:
-          notomate-base-url: ${{ vars.NM_API_BASE_URL }}
-          notomate-api-key: ${{ secrets.NM_API_KEY }}
           feed-url: https://www.usnews.com/rss/news
           max-items: '10'
           timezone: Asia/Taipei
+      - uses: notomate/actions/actions/write-note@v1
+        # An empty feed concludes skipped without content.
+        if: steps.rss.outputs.conclusion == 'success'
+        with:
+          notomate-base-url: ${{ vars.NM_API_BASE_URL }}
+          notomate-api-key: ${{ secrets.NM_API_KEY }}
           note-visibility: private
+          data: ${{ steps.rss.outputs.data }}
+          # Omit title/template to publish the default title and content.
+          title: '{{ date }} {{ feed_title }} Headlines'
+          template: |
+            Retrieved at {{ retrieved_at }}
+
+            {% for item in items %}
+            {% if item.link %}
+            - [{{ item.title | md }}](<{{ item.link }}>)
+            {% else %}
+            - {{ item.title | md }}
+            {% endif %}
+            {% endfor %}

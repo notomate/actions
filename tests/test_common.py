@@ -41,12 +41,25 @@ def test_timeout_post_not_retried(environment, monkeypatch):
 @pytest.mark.parametrize("key,value", [
     ("INPUT_NOTOMATE_API_KEY", ""), ("INPUT_NOTOMATE_BASE_URL", "https://host/api"),
     ("INPUT_NOTOMATE_BASE_URL", "https://user:password@host"),
-    ("INPUT_NOTE_VISIBILITY", "everyone"), ("INPUT_TIMEZONE", "not-a-zone"),
+    ("INPUT_NOTE_VISIBILITY", "everyone"),
 ])
 def test_invalid_settings(environment, monkeypatch, key, value):
     monkeypatch.setenv(key, value)
     with pytest.raises(common.ActionError):
         common.Settings.read()
+
+
+def test_invalid_timezone(monkeypatch):
+    monkeypatch.setenv("INPUT_TIMEZONE", "not-a-zone")
+    with pytest.raises(common.ActionError, match="timezone"):
+        common.timezone_input()
+
+
+def test_note_outputs_include_title_and_content_in_data(outputs):
+    common.note_outputs("Title", "Body\nline", {"items": [1]})
+    values = outputs()
+    assert values["title"] == "Title" and values["content"] == "Body\nline"
+    assert json.loads(values["data"]) == {"items": [1], "title": "Title", "content": "Body\nline"}
 
 
 @pytest.mark.parametrize("payload", [{}, {"workspace": {"id": ""}}, {"workspace": {"id": 7}}, []])

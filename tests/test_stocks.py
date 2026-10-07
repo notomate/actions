@@ -28,8 +28,11 @@ def test_change_and_exchange_date():
     q = stocks.extract_quote("AAPL", history(), {"currency": "USD"})
     assert (q.close, q.change, q.percent, q.volume) == (110, 10, 10, 20)
     assert q.date == "2026-10-03"
-    _, text = stocks.render_quotes([q], [], datetime(2026, 10, 6, tzinfo=ZoneInfo("Asia/Taipei")))
+    _, text, data = stocks.render_quotes([q], [("BAD", "unavailable")], datetime(2026, 10, 6, tzinfo=ZoneInfo("Asia/Taipei")))
     assert "2026-10-03" in text and "Daily data may be incomplete" in text
+    assert data["quotes"] == [{"symbol": "AAPL", "currency": "USD", "date": "2026-10-03", "close": 110,
+                               "change": 10, "percent": 10, "volume": 20}]
+    assert data["failures"] == [{"symbol": "BAD", "error": "unavailable"}]
 
 
 @pytest.mark.parametrize("prices,volumes", [([100], [float("nan")]), ([float("nan"), 100], [10, None])])
@@ -70,17 +73,16 @@ def test_rate_limit_retries(monkeypatch):
 
 
 @pytest.mark.parametrize("all_fail", [False, True])
-def test_partial_and_total_failure(environment, server, monkeypatch, all_fail):
-    monkeypatch.setenv("INPUT_NOTOMATE_BASE_URL", server["url"])
+def test_partial_and_total_failure(outputs, monkeypatch, all_fail):
     monkeypatch.setenv("INPUT_SYMBOLS", "AAPL,BAD")
     quote = stocks.extract_quote("AAPL", history(), {})
     monkeypatch.setattr(stocks, "fetch_quote", Mock(side_effect=[ActionError("unavailable") if all_fail else quote, ActionError("unavailable")]))
     if all_fail:
         with pytest.raises(ActionError, match="All stock symbols failed"):
             stocks.main()
-        assert not server["posts"]
+        assert "content" not in outputs()
     else:
         stocks.main()
-        assert len(server["posts"]) == 1
-        content = server["posts"][0][2]["content"]
-        assert "AAPL" in content and "BAD: unavailable" in content
+        values = outputs()
+        assert "AAPL" in values["content"] and "BAD: unavailable" in values["content"]
+        assert values["conclusion"] == "success" and values["title"].endswith(" Stock Watchlist")

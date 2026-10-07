@@ -1,4 +1,4 @@
-"""Shared inputs and Markdown publication for Notomate's act runner."""
+"""Shared inputs, step outputs and Markdown publication for Notomate's act runner."""
 from __future__ import annotations
 
 import json
@@ -44,13 +44,23 @@ def http_url(value: str, name: str) -> str:
     return value
 
 
+def timezone_input() -> ZoneInfo:
+    try:
+        return ZoneInfo(get_input("timezone", "Asia/Taipei"))
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ActionError("timezone must be a valid IANA time zone, for example Asia/Taipei.") from None
+
+
+def now_in(zone: ZoneInfo) -> datetime:
+    return datetime.now(zone)
+
+
 @dataclass(frozen=True)
 class Settings:
     base_url: str
     api_key: str
     workspace_id: str
     visibility: str
-    timezone: ZoneInfo
 
     @classmethod
     def read(cls) -> Settings:
@@ -63,10 +73,6 @@ class Settings:
         if visibility not in {"private", "public", "workspace"}:
             raise ActionError("note-visibility must be private, public or workspace.")
         try:
-            timezone = ZoneInfo(get_input("timezone", "Asia/Taipei"))
-        except (ZoneInfoNotFoundError, ValueError):
-            raise ActionError("timezone must be a valid IANA time zone, for example Asia/Taipei.") from None
-        try:
             payload = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
             workspace_id = payload["workspace"]["id"]
         except (KeyError, OSError, ValueError, TypeError):
@@ -75,10 +81,7 @@ class Settings:
             raise ActionError("The Notomate event must contain a nonempty workspace.id.")
         if payload.get("event") in {"comment.created", "channel.room_created"}:
             raise ActionError("Use this action with schedule or workflow_dispatch, not comment/channel events.")
-        return cls(base_url.rstrip("/"), api_key, workspace_id, visibility, timezone)
-
-    def now(self) -> datetime:
-        return datetime.now(self.timezone)
+        return cls(base_url.rstrip("/"), api_key, workspace_id, visibility)
 
 
 def output(name: str, value: str) -> None:
@@ -89,6 +92,17 @@ def output(name: str, value: str) -> None:
     delimiter = "nm_" + uuid.uuid4().hex
     with open(path, "a", encoding="utf-8", newline="\n") as stream:
         stream.write(f"{name}<<{delimiter}\n{value}\n{delimiter}\n")
+
+
+def markdown_escape(text: str) -> str:
+    return re.sub(r"([\\`*_{}\[\]()<>#+.!|~-])", r"\\\1", text)
+
+
+def note_outputs(title: str, content: str, data: dict) -> None:
+    """Expose a rendered note and its template data; write-note publishes them."""
+    output("title", title)
+    output("content", content)
+    output("data", json.dumps({**data, "title": title, "content": content}, ensure_ascii=False))
 
 
 def annotation(kind: str, message: str) -> None:

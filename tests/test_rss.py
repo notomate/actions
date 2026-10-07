@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -23,16 +24,26 @@ def test_rss_sort_dedupe_limit_and_plain_summary():
     <item><guid>new</guid><title>New</title><link>https://news.test/new</link><pubDate>Tue, 06 Oct 2026 00:00:00 GMT</pubDate><description><![CDATA[<b>Actual summary</b><script>bad()</script>]]></description></item>
     <item><guid>duplicate</guid><title>Duplicate</title><link>https://news.test/new</link></item>
     <item><title>Unknown date</title></item>'''
-    title, content = render_feed(rss(items), "https://news.test/rss", 2, NOW)
+    title, content, data = render_feed(rss(items), "https://news.test/rss", 2, NOW)
     assert title == "2026-10-06 US News News Digest"
     assert content.index("## New") < content.index("## Old")
     assert "Duplicate" not in content and "Unknown date" not in content
     assert "Actual summary" in content and "<b>" not in content and "bad()" not in content
     assert "https://news.test/new" in content
+    assert data["feed_title"] == "US News" and data["date"] == "2026-10-06"
+    assert data["items"][0] == {"title": "New", "summary": "Actual summary", "link": "https://news.test/new",
+                                "published": "2026-10-06T00:00:00+00:00"}
+    assert [item["title"] for item in data["items"]] == ["New", "Old"]
+
+
+def test_escaped_html_text_is_not_parsed_twice():
+    _, content, data = render_feed(rss("<item><title>a &amp;lt;b&amp;gt; c</title></item>"), "https://news.test", 10, NOW)
+    assert data["items"][0]["title"] == "a <b> c"
+    assert "## a \\<b\\> c" in content
 
 
 def test_undated_entries_preserve_order_and_unsafe_links_removed():
-    _, content = render_feed(rss('<item><title>A</title><link>javascript:alert(1)</link></item><item><title>B</title></item>'), "https://news.test", 10, NOW)
+    _, content, _ = render_feed(rss('<item><title>A</title><link>javascript:alert(1)</link></item><item><title>B</title></item>'), "https://news.test", 10, NOW)
     assert content.index("## A") < content.index("## B")
     assert "javascript:" not in content
     assert "Published/updated at: Not provided" in content
@@ -54,21 +65,26 @@ def test_empty_feed_skips():
 
 
 @pytest.mark.parametrize("empty", [False, True])
-def test_rss_entrypoint_from_unrelated_directory(environment, server, tmp_path, empty):
+def test_rss_entrypoint_outputs_without_publishing(outputs, server, tmp_path, empty):
     server["feed"] = rss() if empty else rss('<item><title>Hello</title><description>World</description></item>')
-    env = dict(os.environ, INPUT_NOTOMATE_BASE_URL=server["url"], INPUT_FEED_URL=server["url"] + "/rss")
+    env = dict(os.environ, INPUT_FEED_URL=server["url"] + "/rss")
     script = Path(__file__).resolve().parents[1] / "scripts/rss_to_note.py"
     result = subprocess.run([sys.executable, str(script)], cwd=tmp_path, env=env, capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert len(server["posts"]) == (0 if empty else 1)
-    assert ("skipped" if empty else "success") in environment.read_text(encoding="utf-8")
+    assert not server["posts"]
+    values = outputs()
+    assert values["conclusion"] == ("skipped" if empty else "success")
+    if empty:
+        assert "content" not in values
+    else:
+        assert "## Hello" in values["content"] and values["title"].endswith(" US News News Digest")
+        assert json.loads(values["data"])["items"][0]["summary"] == "World"
 
 
-def test_bad_feed_entrypoint_fails_without_note(environment, server, tmp_path):
+def test_bad_feed_entrypoint_fails(outputs, server, tmp_path):
     server["feed"] = b"<html>not a feed</html>"
-    env = dict(os.environ, INPUT_NOTOMATE_BASE_URL=server["url"], INPUT_FEED_URL=server["url"] + "/rss")
+    env = dict(os.environ, INPUT_FEED_URL=server["url"] + "/rss")
     script = Path(__file__).resolve().parents[1] / "scripts/rss_to_note.py"
     result = subprocess.run([sys.executable, str(script)], cwd=tmp_path, env=env, capture_output=True, text=True)
     assert result.returncode == 1
-    assert not server["posts"]
-    assert "failure" in environment.read_text(encoding="utf-8")
+    assert outputs() == {"conclusion": "failure"}

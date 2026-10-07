@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import calendar
-import re
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from urllib.parse import quote, urljoin
 
 import feedparser
 
-from common import ActionError, Settings, fetch_feed, get_input, http_url, output, positive_int, publish, run
+from common import (ActionError, fetch_feed, get_input, http_url, markdown_escape, note_outputs, now_in, output,
+                    positive_int, run, timezone_input)
 
 
 class TextOnly(HTMLParser):
@@ -40,10 +40,6 @@ def plain(value: str) -> str:
     return " ".join("".join(parser.parts).split())
 
 
-def markdown_text(value: str) -> str:
-    return re.sub(r"([\\`*_{}\[\]()<>#+.!|~-])", r"\\\1", plain(value))
-
-
 def entry_time(entry):
     parsed = entry.get("published_parsed") or entry.get("updated_parsed")
     if parsed:
@@ -54,7 +50,7 @@ def entry_time(entry):
     return None
 
 
-def render_feed(data: bytes, source: str, limit: int, now: datetime) -> tuple[str, str] | None:
+def render_feed(data: bytes, source: str, limit: int, now: datetime) -> tuple[str, str, dict] | None:
     feed = feedparser.parse(data)
     if not feed.version or feed.get("bozo"):
         raise ActionError("RSS source is not a valid RSS/Atom feed (it may be an HTML error page).")
@@ -84,26 +80,33 @@ def render_feed(data: bytes, source: str, limit: int, now: datetime) -> tuple[st
     name = plain(feed.feed.get("title", "RSS")) or "RSS"
     title = f"{now:%Y-%m-%d} {name} News Digest"
     lines = [f"Retrieved at: {now.isoformat(timespec='seconds')}", "", f"Source: <{quote(source, safe=':/?=&%#@+~,;')}>", ""]
+    items = []
     for entry, link in entries:
-        lines.extend([f"## {markdown_text(entry.get('title', 'Untitled'))}", ""])
         timestamp = entry_time(entry)
-        date = datetime.fromtimestamp(timestamp, timezone.utc).isoformat() if timestamp is not None else "Not provided"
-        lines.extend([f"Published/updated at: {date}", "", markdown_text(entry.get("summary", "No summary provided by the source.")), ""])
+        published = datetime.fromtimestamp(timestamp, timezone.utc).isoformat() if timestamp is not None else None
+        item = {"title": plain(entry.get("title", "")) or "Untitled", "summary": plain(entry.get("summary", "")),
+                "link": link, "published": published}
+        items.append(item)
+        lines.extend([f"## {markdown_escape(item['title'])}", ""])
+        lines.extend([f"Published/updated at: {published or 'Not provided'}", "",
+                      markdown_escape(item["summary"] or "No summary provided by the source."), ""])
         if link:
             lines.extend([f"[Read the original article](<{quote(link, safe=':/?=&%#@+~,;')}>)", ""])
-    return title, "\n".join(lines)
+    data = {"date": f"{now:%Y-%m-%d}", "retrieved_at": now.isoformat(timespec="seconds"), "feed_title": name,
+            "source": source, "items": items}
+    return title, "\n".join(lines), data
 
 
 def main():
-    settings = Settings.read()
+    zone = timezone_input()
     source = http_url(get_input("feed-url", "https://www.usnews.com/rss/news"), "feed-url")
     limit = positive_int("max-items", "10", 100)
-    note = render_feed(fetch_feed(source), source, limit, settings.now())
+    note = render_feed(fetch_feed(source), source, limit, now_in(zone))
     if note is None:
         output("conclusion", "skipped")
-        print("Feed is empty; no note created.")
+        print("Feed is empty; no note content produced.")
         return
-    publish(settings, *note)
+    note_outputs(*note)
     output("conclusion", "success")
 
 

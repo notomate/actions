@@ -20,6 +20,21 @@ def environment(monkeypatch, tmp_path):
 
 
 @pytest.fixture
+def outputs(environment):
+    """Parse GITHUB_OUTPUT; later values win, as in the runner."""
+    def read():
+        if not environment.exists():
+            return {}
+        lines, values = environment.read_text(encoding="utf-8").split("\n"), {}
+        while len(lines) > 1:
+            name, delimiter = lines.pop(0).split("<<")
+            end = lines.index(delimiter)
+            values[name], lines = "\n".join(lines[:end]), lines[end + 1:]
+        return values
+    return read
+
+
+@pytest.fixture
 def server():
     state = {"posts": [], "status": 201, "body": {"id": "note-123"}, "feed": b""}
 

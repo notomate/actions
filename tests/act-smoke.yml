@@ -9,14 +9,23 @@ jobs:
       - uses: ./actions/rss-to-note
         id: rss
         with:
+          feed-url: ${{ env.MOCK_ORIGIN }}/feed
+      - uses: ./actions/write-note
+        id: note
+        if: steps.rss.outputs.conclusion == 'success'
+        with:
           notomate-base-url: ${{ env.MOCK_ORIGIN }}
           notomate-api-key: mock-only-key
-          feed-url: ${{ env.MOCK_ORIGIN }}/feed
+          data: ${{ steps.rss.outputs.data }}
+          template: |
+            {% for item in items %}
+            - {{ item.title }}
+            {% endfor %}
       - name: Verify composite outputs
         shell: bash
         env:
-          NOTE_ID: ${{ steps.rss.outputs.note-id }}
-          CONCLUSION: ${{ steps.rss.outputs.conclusion }}
+          NOTE_ID: ${{ steps.note.outputs.note-id }}
+          CONCLUSION: ${{ steps.note.outputs.conclusion }}
         run: |
           test "$NOTE_ID" = "smoke-note"
           test "$CONCLUSION" = "success"

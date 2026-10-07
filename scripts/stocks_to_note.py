@@ -4,10 +4,10 @@ import logging
 import math
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 
-from common import ActionError, Settings, annotation, get_input, output, publish, run
+from common import ActionError, annotation, get_input, note_outputs, now_in, output, run, timezone_input
 
 
 def parse_symbols(value: str) -> list[str]:
@@ -96,11 +96,13 @@ def render_quotes(quotes: list[Quote], failures: list[tuple[str, str]], now: dat
     if failures:
         lines.extend(["", "## Symbols with unavailable data", ""])
         lines.extend(f"- {cell(symbol)}: {error}" for symbol, error in failures)
-    return f"{now:%Y-%m-%d} Stock Watchlist", "\n".join(lines)
+    data = {"date": f"{now:%Y-%m-%d}", "retrieved_at": now.isoformat(timespec="seconds"),
+            "quotes": [asdict(q) for q in quotes], "failures": [{"symbol": s, "error": e} for s, e in failures]}
+    return f"{now:%Y-%m-%d} Stock Watchlist", "\n".join(lines), data
 
 
 def main():
-    settings = Settings.read()
+    zone = timezone_input()
     symbols = parse_symbols(get_input("symbols", required=True))
     quotes, failures = [], []
     for symbol in symbols:
@@ -110,8 +112,8 @@ def main():
             failures.append((symbol, str(exc)))
             annotation("warning", f"{symbol}: {exc}")
     if not quotes:
-        raise ActionError("All stock symbols failed; no note created.")
-    publish(settings, *render_quotes(quotes, failures, settings.now()))
+        raise ActionError("All stock symbols failed; no note content produced.")
+    note_outputs(*render_quotes(quotes, failures, now_in(zone)))
     output("conclusion", "success")
 
 

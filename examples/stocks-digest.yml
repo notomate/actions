@@ -11,9 +11,30 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: notomate/actions/actions/stocks-to-note@v1
+        id: stocks
+        with:
+          symbols: ${{ vars.STOCK_SYMBOLS }}
+          timezone: Asia/Taipei
+      - uses: notomate/actions/actions/write-note@v1
         with:
           notomate-base-url: ${{ vars.NM_API_BASE_URL }}
           notomate-api-key: ${{ secrets.NM_API_KEY }}
-          symbols: ${{ vars.STOCK_SYMBOLS }}
-          timezone: Asia/Taipei
           note-visibility: private
+          data: ${{ steps.stocks.outputs.data }}
+          # Omit template to publish the default table; this one loops over quotes.
+          template: |
+            Daily bars from Yahoo Finance, retrieved at {{ retrieved_at }}. Not real-time quotes.
+
+            | Symbol | Date | Close | Change % |
+            | --- | --- | ---: | ---: |
+            {% for q in quotes %}
+            | {{ q.symbol | md_cell }} | {{ q.date }} | {{ q.close | number }} {{ q.currency | md_cell }} | {{ q.percent | number('+.2f') }} |
+            {% endfor %}
+            {% if failures %}
+
+            ## Unavailable
+
+            {% for f in failures %}
+            - {{ f.symbol | md }}: {{ f.error }}
+            {% endfor %}
+            {% endif %}

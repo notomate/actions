@@ -1,3 +1,4 @@
+-r note.in
 -r rss.in
 -r stocks.in
 pytest==9.1.1
