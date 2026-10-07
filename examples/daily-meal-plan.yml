@@ -18,6 +18,10 @@ jobs:
           servings: '2'
           dietary-preferences: Taiwanese home cooking, low oil, vegetables with every meal
           excluded-ingredients: '' # Example: peanuts, shrimp
+          language: Traditional Chinese (Taiwan) # Defaults to English
+          instructions: |
+            Each meal should take at most 30 minutes to cook.
+            Estimate the total ingredient cost in TWD at the end of the shopping list.
           timezone: Asia/Taipei
           # model: <a Claude model available to your account>
       - uses: notomate/actions/actions/write-note@v1
@@ -26,7 +30,9 @@ jobs:
           notomate-api-key: ${{ secrets.NM_API_KEY }}
           note-visibility: private
           data: ${{ steps.meal.outputs.data }}
+          # The default title is English; match it to the chosen language here.
+          title: '{{ date }} 午餐與晚餐菜單'
           template: |
-            Servings: {{ servings }}
+            份量：{{ servings }} 人
 
             {{ content }}

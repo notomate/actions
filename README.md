@@ -114,11 +114,15 @@ Pass source text through `data`, not by interpolating `${{ steps.<id>.outputs.co
 | `servings` | `2`, with a supported range of 1–20 |
 | `dietary-preferences` | Taiwanese home cooking with meat and vegetables; alternatives include "vegan" or "low oil" |
 | `excluded-ingredients` | None; specify ingredients such as "peanuts, shrimp" |
+| `language` | `English`; the language Claude writes the menu in, e.g. `Traditional Chinese (Taiwan)` (at most 100 characters) |
+| `instructions` | None; extra instructions such as cooking time, budget, cuisine, number of dishes, or a different note format |
 | `model` | `claude-sonnet-5`; override with a model available to your account |
 
-The action generates one English menu per day, covering lunch and dinner with a staple, main dish, vegetables, ingredient quantities, simple cooking steps, and one combined shopping list. It calculates the date in `timezone` before calling Claude. Preferences and excluded ingredients are included as JSON in the prompt, without shell interpolation. `content` is Claude's Markdown without a top-level heading; `title` is `<date> Lunch and Dinner Menu`.
+`instructions` can change the default sections and format, but the prompt tells Claude never to use excluded ingredients. The default `title` stays in English (`<date> Lunch and Dinner Menu`). To match another language, set `title` on `write-note`, e.g. `'{{ date }} 午餐與晚餐菜單'`, as in [the example](examples/daily-meal-plan.yml).
 
-`data` fields: `date`, `servings`, `dietary_preferences`, and `excluded_ingredients`.
+By default, the action generates one English menu per day, covering lunch and dinner with a staple, main dish, vegetables, ingredient quantities, simple cooking steps, and one combined shopping list. It calculates the date in `timezone` before calling Claude. Preferences and excluded ingredients are included as JSON in the prompt, without shell interpolation. `content` is Claude's Markdown without a top-level heading; `title` is `<date> Lunch and Dinner Menu`.
+
+`data` fields: `date`, `servings`, `dietary_preferences`, `excluded_ingredients`, `language`, and `instructions`.
 
 The action installs a pinned Claude Code CLI (Node.js 22) and runs it in print mode with `--tools ""`, so Claude has no tools or MCP servers and can only return text. Credentials are passed only to that process. Dietary constraints are followed by the model without separate deterministic validation, and menus are not guaranteed to differ across days.
 
@@ -189,4 +193,4 @@ For a real Notomate smoke test, publish an action ref, configure the variables a
 - The specified US News URL timed out on all three attempts from the current network. Mock feed tests do not establish availability of that source.
 - Real Claude generation and publication to a Notomate workspace have not been tested. The repository has not been pushed or tagged as `v1`.
 
-These results predate the split into content actions and `write-note`. Since then, the 76 Windows tests pass; the Linux, `act`, and live checks above have not been rerun.
+These results predate the split into content actions and `write-note`. Since then, the 79 Windows tests pass; the Linux, `act`, and live checks above have not been rerun.

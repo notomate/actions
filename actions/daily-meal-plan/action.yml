@@ -19,6 +19,12 @@ inputs:
   excluded-ingredients:
     description: Ingredients that must not appear in the menu or shopping list.
     required: false
+  language:
+    description: Language Claude writes the menu in, e.g. Traditional Chinese (Taiwan).
+    default: English
+  instructions:
+    description: Extra instructions for Claude, e.g. budget, cooking time, format or number of dishes.
+    required: false
   model:
     description: Claude model ID or alias.
     default: claude-sonnet-5
@@ -30,7 +36,7 @@ outputs:
     description: Claude's Markdown menu.
     value: ${{ steps.run.outputs.content }}
   data:
-    description: JSON template data (title, content, date, servings, dietary_preferences, excluded_ingredients).
+    description: JSON template data (title, content, date, servings, dietary_preferences, excluded_ingredients, language, instructions).
     value: ${{ steps.run.outputs.data }}
   conclusion:
     description: success or failure.
@@ -58,5 +64,7 @@ runs:
         INPUT_SERVINGS: ${{ inputs.servings }}
         INPUT_DIETARY_PREFERENCES: ${{ inputs.dietary-preferences }}
         INPUT_EXCLUDED_INGREDIENTS: ${{ inputs.excluded-ingredients }}
+        INPUT_LANGUAGE: ${{ inputs.language }}
+        INPUT_INSTRUCTIONS: ${{ inputs.instructions }}
         INPUT_MODEL: ${{ inputs.model }}
       run: python "$ACTION_PATH/../../scripts/meal_plan.py"
