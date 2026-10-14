@@ -68,7 +68,7 @@ A failing step stops the job, so `write-note` does not run. RSS can conclude `sk
 | `notomate-api-key` | Yes | Personal API key used for Bearer authentication |
 | `note-visibility` | No | `private`; also accepts `workspace` or `public` |
 | `data` | No | JSON object of template variables, usually `${{ steps.<id>.outputs.data }}`; defaults to `{}` |
-| `title` | No | Jinja2 template for the title; defaults to `{{ title }}`. Whitespace is collapsed to one line |
+| `title` | No | Jinja2 template for the title; defaults to `{{ title }}`, or empty when `data` has no `title`. Whitespace is collapsed to one line; an empty title creates an untitled note |
 | `template` | No | Jinja2 template for the Markdown body; defaults to `{{ content }}` |
 
 | Output | Description |

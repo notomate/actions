@@ -73,7 +73,6 @@ def test_number_filter_handles_missing_values():
 @pytest.mark.parametrize("title,template,data,match", [
     ("{{ title }}", "{{ missing }}", {"title": "t"}, "missing"),
     ("{{ title }}", "{% for x in %}", {"title": "t"}, "template failed"),
-    ("  {{ blank }} ", "body", {"blank": ""}, "title is empty"),
     ("{{ title }}", "{{ content }}", {"title": "t", "content": ""}, "body is empty"),
     ("{{ title }}", "{% for i in items %}{{ i }}{% endfor %}\n", {"title": "t", "items": []}, "body is empty"),
     ("t", "{{ ''.__class__.__mro__ }}", {}, "template failed"),
@@ -81,6 +80,18 @@ def test_number_filter_handles_missing_values():
 def test_template_errors(title, template, data, match):
     with pytest.raises(ActionError, match=match):
         write_note.render(title, template, data)
+
+
+@pytest.mark.parametrize("title,data", [("{{ title }}", {}), ("  {{ blank }} ", {"blank": ""}), ("", {"title": "T"})])
+def test_title_is_optional(title, data):
+    assert write_note.render(title, "body", data) == ("", "body")
+
+
+def test_untitled_note_omits_title(outputs, server, tmp_path):
+    env = dict(os.environ, INPUT_NOTOMATE_BASE_URL=server["url"], INPUT_DATA='{"content": "Body"}')
+    result = subprocess.run([sys.executable, str(ROOT / "scripts/write_note.py")], cwd=tmp_path, env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert [post[2] for post in server["posts"]] == [{"content": "Body", "visibility": "private"}]
 
 
 @pytest.mark.parametrize("value", ["not json", "[1]", '"text"'])

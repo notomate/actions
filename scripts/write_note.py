@@ -26,13 +26,12 @@ def environment() -> SandboxedEnvironment:
 def render(title_template: str, content_template: str, data: dict) -> tuple[str, str]:
     env = environment()
     try:
-        title = env.from_string(title_template).render(data)
+        # title is optional: the default {{ title }} renders empty when data has none.
+        title = env.from_string(title_template).render({"title": "", **data})
         content = env.from_string(content_template).render(data)
     except TemplateError as exc:
         raise ActionError(f"Note template failed: {exc.message or type(exc).__name__}") from None
     title = " ".join(title.split())
-    if not title:
-        raise ActionError("The rendered note title is empty.")
     if not content.strip():
         # e.g. the default {{ content }} after a claude step that dropped the content field.
         raise ActionError("The rendered note body is empty; set template or check that data has content.")

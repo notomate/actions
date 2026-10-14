@@ -14,7 +14,7 @@ inputs:
     description: JSON object used as template variables, usually another action's data output.
     default: '{}'
   title:
-    description: Jinja2 template for the note title; defaults to the data's title.
+    description: Optional Jinja2 template for the note title; defaults to the data's title, if any. An empty title creates an untitled note.
     default: '{{ title }}'
   template:
     description: Jinja2 template for the Markdown note body; defaults to the data's content.

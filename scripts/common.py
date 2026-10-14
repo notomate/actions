@@ -162,7 +162,8 @@ def publish(settings: Settings, title: str, content: str) -> str:
         response = requests.post(
             url,
             headers={"Authorization": f"Bearer {settings.api_key}", "X-Content-Format": "markdown"},
-            json={"title": title, "content": content, "visibility": settings.visibility},
+            # An empty title is omitted so Notomate creates an untitled note.
+            json={**({"title": title} if title else {}), "content": content, "visibility": settings.visibility},
             timeout=(10, 30),
             allow_redirects=False,
         )
